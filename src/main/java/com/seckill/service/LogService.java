@@ -19,7 +19,7 @@ public class LogService {
     @Autowired
     LogsDao logsDao;
 
-    private LogHandle logHandle = new LogHandle(100);
+    private LogHandle logHandle = new LogHandle(500);
 
     @PostConstruct
     private void init(){
