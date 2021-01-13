@@ -49,7 +49,7 @@ public class RedisSecKillService implements SecKillService{
      * 初始化热门商品信息
      */
     @PostConstruct
-    private void init(){
+    public void init(){
         List<Goods> goodsList = goodsDao.hostList();
         for(Goods goods:goodsList){
             //加入缓存 设置60秒过期

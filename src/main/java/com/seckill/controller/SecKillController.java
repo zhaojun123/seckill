@@ -80,4 +80,11 @@ public class SecKillController implements ApplicationContextAware {
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
     }
+
+    @RequestMapping("/reset")
+    public String reset(){
+        ramSecKillService.init();
+        ramSecKillService.init();
+        return "ok";
+    }
 }

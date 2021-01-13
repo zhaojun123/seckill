@@ -38,7 +38,7 @@ public class RamSecKillService implements SecKillService{
      * 初始化热门商品信息
      */
     @PostConstruct
-    private void init(){
+    public void init(){
         List<Goods> goodsList = goodsDao.hostList();
         for(Goods goods:goodsList){
             GoodsInfo goodsInfo = new GoodsInfo();
@@ -166,7 +166,5 @@ public class RamSecKillService implements SecKillService{
         //是否是有效的，如果数据库找不到说明无效
         private volatile boolean effective = true;
     }
-
-
 
 }
