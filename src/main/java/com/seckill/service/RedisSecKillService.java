@@ -57,7 +57,7 @@ public class RedisSecKillService implements SecKillService{
     @Override
     public Boolean secKill(Long userId, Long goodId) {
         //记录抢单日志
-        logService.record(goodId,userId);
+        logService.send(goodId,userId);
         Long stockNum = getStockNum(goodId);
         //如果stockNum为null 说明缓存没有找到，执行锁并且初始化数据
         if(stockNum == null){
