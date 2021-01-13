@@ -43,20 +43,4 @@ public class SecKillBloomFilter implements Filter {
             bloomFilter.put(String.valueOf(i));
         }
     }
-
-    public static void main(String[] args) throws NoSuchFieldException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
-        BloomFilter bloomFilter = BloomFilter.create(Funnels.stringFunnel(Charset.defaultCharset()),1000000,0.001);
-        for(int i=1;i<=1000000;i++){
-            bloomFilter.put(String.valueOf(i));
-        }
-        System.err.println(bloomFilter.mightContain("user"));
-        Method method = BloomFilter.class.getDeclaredMethod("bitSize");
-        method.setAccessible(true);
-        Object size =  method.invoke(bloomFilter);
-        System.err.println(size);
-
-        Object object = new Object();
-        String s = ClassLayout.parseInstance(object).toPrintable();
-        System.err.println(s);
-    }
 }

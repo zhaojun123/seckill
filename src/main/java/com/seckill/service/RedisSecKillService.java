@@ -42,6 +42,9 @@ public class RedisSecKillService implements SecKillService{
     //设定缓存60秒过期
     private long timeOut = 60;
 
+    //当该值为0时表明库存已抢光，后续请求不再请求redis
+    private volatile int remainStockNum = -1;
+
     /**
      * 初始化热门商品信息
      */
@@ -58,6 +61,9 @@ public class RedisSecKillService implements SecKillService{
     public Boolean secKill(Long userId, Long goodId) {
         //记录抢单日志
         logService.send(goodId,userId);
+        if(remainStockNum == 0){
+            return false;
+        }
         Long stockNum = getStockNum(goodId);
         //如果stockNum为null 说明缓存没有找到，执行锁并且初始化数据
         if(stockNum == null){
@@ -78,6 +84,8 @@ public class RedisSecKillService implements SecKillService{
         }
         //库存不足
         if(stockNum<0){
+            //后续请求不再访问redis
+            remainStockNum = 0;
             return false;
         }
         //下单 减库存
@@ -88,6 +96,12 @@ public class RedisSecKillService implements SecKillService{
         return true;
     }
 
+    /**
+     * 通过redis获取库存
+     * @param goodId
+     * @return
+     */
+    //TODO这里可以加上断路器，如果熔断，将remainStockNum设置成0
     private Long getStockNum(Long goodId){
         //通过lua 判断key是否存在，如果不存在返回 null 存在则调用decrement  并返回结果
         String lua = "if redis.call('EXISTS', '"+secKillGoodsPrefix+goodId+"') == 1 then \n" +
