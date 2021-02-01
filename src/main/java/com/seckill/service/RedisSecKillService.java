@@ -1,6 +1,7 @@
 package com.seckill.service;
 
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.seckill.dao.GoodsDao;
 import com.seckill.po.Goods;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,25 +68,12 @@ public class RedisSecKillService implements SecKillService{
         Long stockNum = getStockNum(goodId);
         //如果stockNum为null 说明缓存没有找到，执行锁并且初始化数据
         if(stockNum == null){
-            String uuid = UUID.randomUUID().toString();
-            //加锁 为了防止死锁10秒过期
-            if(lock(goodId,uuid,10L)){
-                try{
-                    //初始化数据
-                    Goods goods = goodsDao.get(goodId);
-                    //加入缓存 设置60秒过期,极端情况下为了防止锁已经超时，这里用setIfAbsent
-                    redisTemplate.opsForValue().setIfAbsent(secKillGoodsPrefix+goods.getGoodId(),String.valueOf(goods.getStock()),timeOut, TimeUnit.SECONDS);
-                }finally {
-                    release(goodId,uuid);
-                }
-            }
+            initGoods(goodId);
             //这里业务应该更复杂 需要等待初始化， 但是为了性能可以有一些业务瑕疵，所以抢购不是越快越好，运气很重要
             return false;
         }
         //库存不足
         if(stockNum<0){
-            //后续请求不再访问redis
-            remainStockNum = 0;
             return false;
         }
         //下单 减库存
@@ -94,24 +82,6 @@ public class RedisSecKillService implements SecKillService{
         //下订单
         orderService.order(userId,goodId);
         return true;
-    }
-
-    /**
-     * 通过redis获取库存
-     * @param goodId
-     * @return
-     */
-    //TODO这里可以加上断路器，如果熔断，将remainStockNum设置成0
-    private Long getStockNum(Long goodId){
-        //通过lua 判断key是否存在，如果不存在返回 null 存在则调用decrement  并返回结果
-        String lua = "if redis.call('EXISTS', '"+secKillGoodsPrefix+goodId+"') == 1 then \n" +
-                " redis.call('EXPIRE','"+secKillGoodsPrefix+goodId+"',"+timeOut+")\n"+
-                " return redis.call('DECRBY', '"+secKillGoodsPrefix+goodId+"',1)\n "+
-                " else \n"+
-                " return nil \n" +
-                "end";
-        Long stockNum = (Long)redisTemplate.execute(new DefaultRedisScript(lua,Long.class),null);
-        return stockNum;
     }
 
     /**
@@ -134,5 +104,66 @@ public class RedisSecKillService implements SecKillService{
         String lua = "if redis.call('get', '"+secKillLockPrefix+goodId+"') == '"+requestId+"' then return redis.call('del', '"+secKillLockPrefix+goodId+"') else return 0 end";
         Long result = (Long)redisTemplate.execute(new DefaultRedisScript(lua,Long.class),null);
         return 1 == result;
+    }
+
+
+    /**
+     * 通过redis获取库存
+     * @param goodId
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "getStockNumFallBack",groupKey = "accessRedis",commandKey = "getStockNum")
+    private Long getStockNum(Long goodId){
+        //通过lua 判断key是否存在，如果不存在返回 null 存在则调用decrement  并返回结果
+        String lua = "if redis.call('EXISTS', '"+secKillGoodsPrefix+goodId+"') == 1 then \n" +
+                " redis.call('EXPIRE','"+secKillGoodsPrefix+goodId+"',"+timeOut+")\n"+
+                " return redis.call('DECRBY', '"+secKillGoodsPrefix+goodId+"',1)\n "+
+                " else \n"+
+                " return nil \n" +
+                "end";
+        Long stockNum = (Long)redisTemplate.execute(new DefaultRedisScript(lua,Long.class),null);
+        if(stockNum != null && stockNum<0){
+            //后续请求不再访问redis
+            remainStockNum = 0;
+        }
+        return stockNum;
+    }
+
+    /**
+     * {@link RedisSecKillService#getStockNum(java.lang.Long)} 熔断后执行的业务
+     * @param goodId
+     * @return
+     */
+    private Long getStockNumFallBack(Long goodId,Throwable exception){
+        return 0L;
+    }
+
+    /**
+     * 初始化商品 并且加入到redis中
+     * @param goodId
+     */
+    @HystrixCommand(fallbackMethod = "initGoodsBack",groupKey = "initGoods",commandKey = "initGoods")
+    private void initGoods(Long goodId){
+        String uuid = UUID.randomUUID().toString();
+        //加锁 为了防止死锁1秒过期
+        if(lock(goodId,uuid,1L)){
+            try{
+                //初始化数据
+                Goods goods = goodsDao.get(goodId);
+                //加入缓存 设置60秒过期,极端情况下为了防止锁已经超时，这里用setIfAbsent
+                redisTemplate.opsForValue().setIfAbsent(secKillGoodsPrefix+goods.getGoodId(),String.valueOf(goods.getStock()),timeOut, TimeUnit.SECONDS);
+            }finally {
+                release(goodId,uuid);
+            }
+        }
+    }
+
+    /**
+     * {@link RedisSecKillService#initGoods(java.lang.Long) }熔断后执行的业务
+     * @param goodId
+     * @param exception
+     */
+    private void initGoodsBack(Long goodId,Throwable exception){
+
     }
 }

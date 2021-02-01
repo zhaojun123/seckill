@@ -1,20 +1,17 @@
 package com.seckill.filter;
 
-import com.seckill.utils.ApplicationContextUtils;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import javax.servlet.*;
 import java.io.IOException;
 
-
 public class RedisSecKillBloomFilter implements Filter {
 
+    @Autowired
     private RedisTemplate redisTemplate;
-
-    public RedisSecKillBloomFilter(RedisTemplate redisTemplate){
-        this.redisTemplate = redisTemplate;
-    }
 
     private byte[] falseBytes = "false".getBytes();
 
@@ -32,17 +29,6 @@ public class RedisSecKillBloomFilter implements Filter {
     }
 
     /**
-     * 判断goodId 是否合法
-     * @param goodId
-     * @return
-     */
-    private boolean mightContain(String goodId){
-        String lua = "local result_1 = redis.call('BF.EXISTS', '"+key+"','"+goodId+"')\n" +
-                "return result_1";
-        return (Boolean)redisTemplate.execute(new DefaultRedisScript(lua,Boolean.class),null);
-    }
-
-    /**
      * 预先插入 1到100万的goodsId 作为合法值
      * @param filterConfig
      */
@@ -56,5 +42,26 @@ public class RedisSecKillBloomFilter implements Filter {
                 "end\n";
         redisTemplate.execute(new DefaultRedisScript(lua),null);
         System.err.println("bloom 初始化 耗时"+(System.currentTimeMillis()-begin)/1000);
+    }
+
+    /**
+     * 判断goodId 是否合法
+     * @param goodId
+     * @return
+     */
+    @HystrixCommand(fallbackMethod = "mightContainFallBack",groupKey = "accessRedis",commandKey = "mightContain")
+    private boolean mightContain(String goodId){
+        String lua = "local result_1 = redis.call('BF.EXISTS', '"+key+"','"+goodId+"')\n" +
+                "return result_1";
+        return (Boolean)redisTemplate.execute(new DefaultRedisScript(lua,Boolean.class),null);
+    }
+
+    /**
+     * {@link RedisSecKillBloomFilter#mightContain(java.lang.String)} 熔断后的处理
+     * @param goodId
+     * @return
+     */
+    private boolean mightContainFallBack(String goodId){
+        return false;
     }
 }

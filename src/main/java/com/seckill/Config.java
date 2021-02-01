@@ -26,10 +26,15 @@ public class Config {
 
     @Bean
     @ConditionalOnProperty(value = "secKill.redis.bloom.enable",havingValue = "true")
-    public FilterRegistrationBean secKillRedisBloomFilter(RedisTemplate redisTemplate){
-        RedisSecKillBloomFilter redisSecKillBloomFilter = new RedisSecKillBloomFilter(redisTemplate);
+    public RedisSecKillBloomFilter redisSecKillBloomFilter(){
+        return new RedisSecKillBloomFilter();
+    }
+
+    @Bean
+    @ConditionalOnProperty(value = "secKill.redis.bloom.enable",havingValue = "true")
+    public FilterRegistrationBean secKillRedisBloomFilter(){
         FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
-        filterRegistrationBean.setFilter(redisSecKillBloomFilter);
+        filterRegistrationBean.setFilter(redisSecKillBloomFilter());
         filterRegistrationBean.addUrlPatterns("/secKill/redisSecKill");
         return filterRegistrationBean;
     }
