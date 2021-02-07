@@ -148,7 +148,7 @@ public class RedisSecKillService implements SecKillService{
      */
     private void initGoods(Long goodId){
         String uuid = UUID.randomUUID().toString();
-        //加锁 为了防止死锁1秒过期
+        //加锁 为了防止死锁1秒过期      set key value ex 1 nx
         if(lock(goodId,uuid,1L)){
             try{
                 //初始化数据
