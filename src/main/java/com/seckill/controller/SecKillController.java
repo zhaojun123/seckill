@@ -1,5 +1,6 @@
 package com.seckill.controller;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.seckill.service.*;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,7 +85,7 @@ public class SecKillController implements ApplicationContextAware {
     @RequestMapping("/reset")
     public String reset(){
         ramSecKillService.init();
-        ramSecKillService.init();
+        redisSecKillService.init();
         return "ok";
     }
 }

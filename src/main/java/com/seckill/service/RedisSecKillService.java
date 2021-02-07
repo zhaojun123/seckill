@@ -56,9 +56,11 @@ public class RedisSecKillService implements SecKillService{
             //加入缓存 设置60秒过期
             redisTemplate.opsForValue().set(secKillGoodsPrefix+goods.getGoodId(),String.valueOf(goods.getStock()),timeOut, TimeUnit.SECONDS);
         }
+        remainStockNum = -1;
     }
 
     @Override
+    @HystrixCommand(fallbackMethod = "secKillFallBack",commandKey = "secKill")
     public Boolean secKill(Long userId, Long goodId) {
         //记录抢单日志
         logService.send(goodId,userId);
@@ -82,6 +84,18 @@ public class RedisSecKillService implements SecKillService{
         //下订单
         orderService.order(userId,goodId);
         return true;
+    }
+
+    /**
+     * 处理secKill的熔断业务
+     * @param userId
+     * @param goodId
+     * @param e
+     * @return
+     */
+    public Boolean secKillFallBack(Long userId, Long goodId,Throwable e){
+        //e.printStackTrace();
+        return false;
     }
 
     /**
@@ -112,8 +126,7 @@ public class RedisSecKillService implements SecKillService{
      * @param goodId
      * @return
      */
-    @HystrixCommand(fallbackMethod = "getStockNumFallBack",groupKey = "accessRedis",commandKey = "getStockNum")
-    private Long getStockNum(Long goodId){
+    public Long getStockNum(Long goodId){
         //通过lua 判断key是否存在，如果不存在返回 null 存在则调用decrement  并返回结果
         String lua = "if redis.call('EXISTS', '"+secKillGoodsPrefix+goodId+"') == 1 then \n" +
                 " redis.call('EXPIRE','"+secKillGoodsPrefix+goodId+"',"+timeOut+")\n"+
@@ -130,19 +143,9 @@ public class RedisSecKillService implements SecKillService{
     }
 
     /**
-     * {@link RedisSecKillService#getStockNum(java.lang.Long)} 熔断后执行的业务
-     * @param goodId
-     * @return
-     */
-    private Long getStockNumFallBack(Long goodId,Throwable exception){
-        return 0L;
-    }
-
-    /**
      * 初始化商品 并且加入到redis中
      * @param goodId
      */
-    @HystrixCommand(fallbackMethod = "initGoodsBack",groupKey = "initGoods",commandKey = "initGoods")
     private void initGoods(Long goodId){
         String uuid = UUID.randomUUID().toString();
         //加锁 为了防止死锁1秒过期
@@ -156,14 +159,5 @@ public class RedisSecKillService implements SecKillService{
                 release(goodId,uuid);
             }
         }
-    }
-
-    /**
-     * {@link RedisSecKillService#initGoods(java.lang.Long) }熔断后执行的业务
-     * @param goodId
-     * @param exception
-     */
-    private void initGoodsBack(Long goodId,Throwable exception){
-
     }
 }

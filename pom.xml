@@ -22,6 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <spring-cloud.version>Greenwich.RELEASE</spring-cloud.version>
+        <skipTests>true</skipTests>
     </properties>
 
     <dependencies>
