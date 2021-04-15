@@ -148,16 +148,11 @@ public class RedisSecKillService implements SecKillService{
      */
     private void initGoods(Long goodId){
         String uuid = UUID.randomUUID().toString();
-        //加锁 为了防止死锁1秒过期      set key value ex 1 nx
+        //加锁 为了防止死锁1秒过期
         if(lock(goodId,uuid,1L)){
             try{
                 //初始化数据
                 Goods goods = goodsDao.get(goodId);
-                if(goods == null){
-                    goods = new Goods();
-                    goods.setGoodId(goodId);
-                    goods.setStock(0);
-                }
                 //加入缓存 设置60秒过期,极端情况下为了防止锁已经超时，这里用setIfAbsent
                 redisTemplate.opsForValue().setIfAbsent(secKillGoodsPrefix+goods.getGoodId(),String.valueOf(goods.getStock()),timeOut, TimeUnit.SECONDS);
             }finally {

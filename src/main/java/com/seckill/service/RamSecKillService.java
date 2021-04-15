@@ -93,13 +93,13 @@ public class RamSecKillService implements SecKillService{
                     Goods goods = goodsDao.get(goodId);
                     //如果商品不存在，设置为无效
                     if(goods == null){
-                        old.effective = false;
+                        goodsInfo.effective = false;
                     }else{
-                        old.goodsId = goods.getGoodId();
-                        old.stock = new AtomicInteger(goods.getStock());
+                        goodsInfo.goodsId = goods.getGoodId();
+                        goodsInfo.stock = new AtomicInteger(goods.getStock());
                     }
                     //设置初始化完成
-                    old.initialized = true;
+                    goodsInfo.initialized = true;
                     //唤醒其他阻塞的线程
                     goodsInfo.notifyAll();
                 }
